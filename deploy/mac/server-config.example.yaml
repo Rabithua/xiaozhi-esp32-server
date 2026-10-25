@@ -1,0 +1,13 @@
+# Copy to <STATE_DIR>/server-data/.config.yaml and chmod 600 before voice starts.
+server:
+  ip: 0.0.0.0
+  port: 8000
+  http_port: 8003
+  # This is advertised to clients. Replace with the Mac LAN URL for devices.
+  vision_explain: http://127.0.0.1:8002/mcp/vision/explain
+manager-api:
+  # Docker service DNS, not the host's loopback or a personal LAN address.
+  url: http://web:8002/xiaozhi
+  # Fill locally from management parameter server.secret; never commit it.
+  secret: ""
+prompt_template: agent-base-prompt.txt

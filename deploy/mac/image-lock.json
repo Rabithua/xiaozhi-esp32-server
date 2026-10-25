@@ -1,0 +1,13 @@
+{
+  "upstream_repository": "https://github.com/xinnan-tech/xiaozhi-esp32-server",
+  "reference_source_commit": "9bd668aebc733d77c95d8aa5fb1d25090a772509",
+  "platform": "linux/arm64",
+  "images": {
+    "db": "mysql@sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69",
+    "redis": "redis@sha256:ae471bdc20de180beed36e347d170ec0bdf8faa327959ea1f24692f22b05b955",
+    "web": "ghcr.io/xinnan-tech/xiaozhi-esp32-server@sha256:6ccb4aad9caab93cc063f2d60c1e54b143b08b8b567dd6b471157fa0a56c6dcd",
+    "server": "ghcr.io/xinnan-tech/xiaozhi-esp32-server@sha256:abeaa1faf06c4f55a96ed1c4d675da91dc5ce75a617f32c8a82c471f6dbf2a4e"
+  },
+  "provider_source": "main/xiaozhi-server/core/providers/asr/aliyunbl_stream.py",
+  "image_source_revision_verified": false
+}

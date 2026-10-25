@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+!image-lock.json
+.config.yaml
+state/
+logs/
+__pycache__/

@@ -45,7 +45,7 @@ class ASRProvider(ASRProviderBase):
         self.inverse_text_normalization_enabled = config.get("inverse_text_normalization_enabled", True)
 
         # WebSocket URL
-        self.ws_url = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+        self.ws_url = config.get("ws_url") or "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
 
         self.output_dir = config.get("output_dir", "./audio_output")
         self.delete_audio_file = delete_audio_file
@@ -77,6 +77,9 @@ class ASRProvider(ASRProviderBase):
     async def _start_recognition(self, conn: "ConnectionHandler"):
         """开始识别会话"""
         try:
+            # 新任务不能复用上个失败或中断任务的文本。
+            self.text = ""
+
             # 如果为手动模式,设置超时时长为最大值
             if conn.client_listen_mode == "manual":
                 self.max_sentence_silence = 6000
@@ -144,6 +147,14 @@ class ASRProvider(ASRProviderBase):
                 "input": {}
             }
         }
+
+        if self.model.startswith("qwen-audio-3.1-asr-flash-streaming"):
+            message["payload"]["parameters"] = {
+                "format": self.format,
+                "sample_rate": self.sample_rate,
+                "vad_model": "near_meeting_16k",
+            }
+            return message
 
         # 只有当模型名称以v2结尾时才添加vocabulary_id参数
         if self.model.lower().endswith("v2"):
@@ -219,6 +230,13 @@ class ASRProvider(ASRProviderBase):
                     # 处理task-finished事件
                     elif event == "task-finished":
                         logger.bind(tag=TAG).debug("任务已完成")
+                        # 手动录音的最终文本可能已在松开按键前返回。
+                        if (
+                            conn.client_listen_mode == "manual"
+                            and conn.client_voice_stop
+                            and self.text
+                        ):
+                            await self.handle_voice_stop(conn, conn.asr_audio)
                         break
 
                     # 处理task-failed事件

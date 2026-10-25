@@ -1,0 +1,83 @@
+name: ${COMPOSE_PROJECT_NAME:-xiaozhi-mac}
+
+services:
+  db:
+    image: ${MYSQL_IMAGE:-mysql@sha256:76f0358884cb92d9a086d24e5671c38048d3fef40f2588703d73eb55392d6b69}
+    platform: linux/arm64
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set a private database root password}
+      MYSQL_DATABASE: xiaozhi_esp32_server
+      MYSQL_USER: xiaozhi
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set a private database application password}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--innodb-buffer-pool-size=256M"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: ${REDIS_IMAGE:-redis@sha256:ae471bdc20de180beed36e347d170ec0bdf8faa327959ea1f24692f22b05b955}
+    platform: linux/arm64
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set a private Redis password}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/xinnan-tech/xiaozhi-esp32-server@sha256:6ccb4aad9caab93cc063f2d60c1e54b143b08b8b567dd6b471157fa0a56c6dcd}
+    platform: linux/arm64
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${WEB_BIND_IP:-127.0.0.1}:8002:8002"
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
+      SPRING_DATASOURCE_DRUID_URL: jdbc:mysql://db:3306/xiaozhi_esp32_server?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_DRUID_USERNAME: xiaozhi
+      SPRING_DATASOURCE_DRUID_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_DATA_REDIS_PORT: "6379"
+    volumes:
+      - ${STATE_DIR:?Set an absolute private state directory}/uploads:/uploadfile
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+  server:
+    image: ${SERVER_IMAGE:-ghcr.io/xinnan-tech/xiaozhi-esp32-server@sha256:abeaa1faf06c4f55a96ed1c4d675da91dc5ce75a617f32c8a82c471f6dbf2a4e}
+    platform: linux/arm64
+    profiles: [voice]
+    restart: unless-stopped
+    stdin_open: true
+    depends_on:
+      web:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8003:8003"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ${STATE_DIR:?Set an absolute private state directory}/server-data:/opt/xiaozhi-esp32-server/data
+      # The published image predates this checkout's provider changes.
+      - ../../main/xiaozhi-server/core/providers/asr/aliyunbl_stream.py:/opt/xiaozhi-esp32-server/core/providers/asr/aliyunbl_stream.py:ro
+
+volumes:
+  mysql-data:
+  redis-data:
